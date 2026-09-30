@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>교육 시청 확인표</title>
+<style>
+:root{--line:#d9dee7;--head:#f3f6fa;--done:#e8f5e9;--doneText:#237a38;--exam:#fff3cd;--accent:#466b9b}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;background:#f6f7f9;color:#222}
+.wrap{max-width:1600px;margin:auto;padding:12px}
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 12px #0001;padding:14px}
+h1{text-align:center;font-size:26px;margin:4px 0 5px}
+.sub{text-align:center;color:#666;font-size:16px;margin-bottom:10px}
+.userbox{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 6px;font-size:16px;font-weight:700}
+.userbox input{width:150px;padding:7px 9px;border:1px solid #cbd2dc;border-radius:8px;font-size:17px;text-align:center}
+#ownerTitle{color:#466b9b;font-size:17px}
+.summary{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:10px 0 14px}
+.progress{width:min(440px,72vw);height:12px;background:#e8ecf1;border-radius:99px;overflow:hidden}
+.bar{height:100%;background:var(--accent);width:0}
+.scroller{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:74vh}
+table{border-collapse:separate;border-spacing:0;min-width:2250px;width:100%;font-size:16px}
+th,td{border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:center;padding:5px;background:#fff;height:44px}
+thead th{background:var(--head);font-weight:700;position:sticky;top:0;z-index:3}
+thead tr:nth-child(2) th{top:53px}
+.num{position:sticky;left:0;z-index:2;width:42px;min-width:42px}
+.subject{position:sticky;left:42px;z-index:2;min-width:155px;width:155px}
+thead .num,thead .subject{z-index:6;background:#eaf0f6}
+.subject input{width:122px;border:0;border-bottom:1px dashed #999;text-align:center;font:inherit;font-size:19px;font-weight:800;background:transparent;padding:5px}
+.week{min-width:162px;height:53px}
+.weekno{font-size:17px;font-weight:800}
+.dates{font-size:14px;color:#666;margin-top:3px;font-weight:500}
+.lesson{width:54px;min-width:54px;cursor:pointer;user-select:none;font-size:23px}
+.lesson:hover{background:#f0f6ff}
+.lesson.done{background:var(--done);color:var(--doneText);font-weight:900}
+.exam{background:var(--exam)!important;min-width:100px;cursor:pointer}
+.exam.done{background:#dff0d8!important;color:#246b2a;font-weight:800}
+.exam .dates{color:#795d00}
+.rate{min-width:96px;font-size:14px;font-weight:800}
+.time{display:block;font-size:11px;font-weight:500;line-height:1.05;margin-top:2px}
+.actions{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{border:1px solid #cbd2dc;background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
+button:hover{background:#f4f6f9}
+.note{font-size:14px;color:#666;text-align:center;margin-top:9px;line-height:1.5}
+@media(max-width:600px){
+ .wrap{padding:5px}.card{padding:7px;border-radius:8px}h1{font-size:22px}
+ .subject{min-width:125px;width:125px}.subject input{width:96px}
+ .lesson{min-width:50px}.scroller{max-height:78vh}
+}
+</style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+<h1>📚 교육 시청 확인표</h1>
+<div class="sub">2026학년도 2학기 · 1주차 시작 8월 31일</div>
+<div class="userbox">
+  <label for="userName">사용자</label>
+  <input id="userName" type="text" maxlength="20" placeholder="이름 입력">
+  <span id="ownerTitle"></span>
+</div>
+<div class="summary">
+  <b id="totalText"></b>
+  <div class="progress"><div class="bar" id="bar"></div></div>
+</div>
+<div class="scroller">
+<table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+</div>
+<div class="actions">
+ <button id="exportBtn">기록 백업</button>
+ <button id="importBtn">기록 복원</button>
+ <input id="file" type="file" accept=".json" hidden>
+</div>
+<div class="note">
+강의 칸을 누르면 완료 날짜·시간이 자동 저장됩니다. 완료된 칸을 다시 누르면 확인 후 취소할 수 있습니다.<br>
+중간고사 기간은 10/19~10/26으로 표시했습니다. 기록은 현재 브라우저에 자동 저장됩니다.
+</div>
+</div></div>
+<script>
+const ranges = ["8/31~9/6", "9/7~9/13", "9/14~9/20", "9/21~9/27", "9/28~10/4", "10/5~10/11", "10/12~10/18", "10/19~10/25", "10/26~11/1", "11/2~11/8", "11/9~11/15", "11/16~11/22", "11/23~11/29", "11/30~12/6"];
+const N=8, KEY='lectureTracker2026v2';
+let data=JSON.parse(localStorage.getItem(KEY)||'null')||{
+ userName:'',subjects:Array.from({length:N},(_,i)=>`과목 ${i+1}`),done:{},exams:{}
+};
+const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));update()};
+const fmt=()=>new Intl.DateTimeFormat('ko-KR',{
+ month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false
+}).format(new Date()).replace(/\.$/,'');
+
+function buildHead(){
+ let a='<tr><th class="num" rowspan="2">No.</th><th class="subject" rowspan="2">과목</th>';
+ for(let w=1;w<=14;w++){
+   a+=`<th class="week" colspan="3"><div class="weekno">${w}주차</div><div class="dates">${ranges[w-1]}</div></th>`;
+   if(w===7) a+=`<th class="exam" rowspan="2"><b>중간고사</b><div class="dates">10/19~10/26</div></th>`;
+ }
+ a+=`<th class="exam" rowspan="2"><b>기말고사</b></th><th rowspan="2">진도율</th></tr><tr>`;
+ for(let w=1;w<=14;w++) a+='<th>1강</th><th>2강</th><th>3강</th>';
+ a+='</tr>';
+ document.querySelector('#thead').innerHTML=a;
+}
+function buildBody(){
+ let out='';
+ for(let s=0;s<N;s++){
+   out+=`<tr><td class="num">${s+1}</td><td class="subject"><input data-sub="${s}" value="${(data.subjects[s]||'').replaceAll('"','&quot;')}"></td>`;
+   for(let w=1;w<=14;w++){
+     for(let l=1;l<=3;l++){
+       let k=`${s}-${w}-${l}`,v=data.done[k];
+       out+=`<td class="lesson ${v?'done':''}" data-key="${k}" title="${v||''}">${v?'✓<span class="time">'+v+'</span>':'○'}</td>`;
+     }
+     if(w===7){
+       let k=`${s}-중간고사`,v=data.exams[k];
+       out+=`<td class="exam ${v?'done':''}" data-exam="${k}" title="${v||''}">${v?'✓<span class="time">'+v+'</span>':'○'}</td>`;
+     }
+   }
+   let fk=`${s}-기말고사`,fv=data.exams[fk];
+   out+=`<td class="exam ${fv?'done':''}" data-exam="${fk}" title="${fv||''}">${fv?'✓<span class="time">'+fv+'</span>':'○'}</td>`;
+   out+=`<td class="rate" id="r${s}"></td></tr>`;
+ }
+ document.querySelector('#tbody').innerHTML=out;
+ document.querySelectorAll('[data-sub]').forEach(el=>el.onchange=e=>{
+   data.subjects[+e.target.dataset.sub]=e.target.value;save()
+ });
+ document.querySelectorAll('[data-key]').forEach(el=>el.onclick=()=>toggle('done',el.dataset.key));
+ document.querySelectorAll('[data-exam]').forEach(el=>el.onclick=()=>toggle('exams',el.dataset.exam));
+ update();
+}
+function toggle(type,k){
+ if(data[type][k]){
+   if(confirm('이 완료 기록을 취소할까요?')) delete data[type][k]; else return;
+ }else data[type][k]=fmt();
+ save();buildBody();
+}
+function update(){
+ let total=0;
+ for(let s=0;s<N;s++){
+   let n=0;
+   for(let w=1;w<=14;w++)for(let l=1;l<=3;l++)if(data.done[`${s}-${w}-${l}`])n++;
+   total+=n;
+   let el=document.querySelector('#r'+s);
+   if(el)el.textContent=`${n}/42 (${Math.round(n/42*100)}%)`;
+ }
+ const max=N*42,p=Math.round(total/max*100);
+ document.querySelector('#totalText').textContent=`전체 진도 ${total} / ${max}강 (${p}%)`;
+ document.querySelector('#bar').style.width=p+'%';
+}
+document.querySelector('#exportBtn').onclick=()=>{
+ let a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+ a.download='교육시청확인표_백업.json';a.click();URL.revokeObjectURL(a.href)
+};
+document.querySelector('#importBtn').onclick=()=>document.querySelector('#file').click();
+document.querySelector('#file').onchange=e=>{
+ let f=e.target.files[0];if(!f)return;
+ let r=new FileReader();
+ r.onload=()=>{try{data=JSON.parse(r.result);save();buildBody();alert('복원되었습니다.')}catch{alert('올바른 백업 파일이 아닙니다.')}};
+ r.readAsText(f)
+};
+const userNameEl=document.querySelector('#userName');
+const ownerTitle=document.querySelector('#ownerTitle');
+userNameEl.value=data.userName||'';
+function showOwner(){
+ ownerTitle.textContent=data.userName ? `${data.userName}님의 수강표` : '';
+}
+userNameEl.onchange=()=>{
+ data.userName=userNameEl.value.trim();
+ save();showOwner();
+};
+showOwner();
+buildHead();buildBody();
+</script>
+</body></html>
