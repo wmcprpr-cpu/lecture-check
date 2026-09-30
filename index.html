@@ -26,7 +26,8 @@ thead tr:nth-child(2) th{top:53px}
 .num{position:sticky;left:0;z-index:2;width:42px;min-width:42px}
 .subject{position:sticky;left:42px;z-index:2;min-width:155px;width:155px}
 thead .num,thead .subject{z-index:6;background:#eaf0f6}
-.subject input{width:122px;border:0;border-bottom:1px dashed #999;text-align:center;font:inherit;font-size:19px;font-weight:800;background:transparent;padding:5px}
+.subject-head{font-size:20px!important;font-weight:800!important}
+.subject input{width:122px;border:0;border-bottom:1px dashed #999;text-align:center;font:inherit;font-size:16px;font-weight:500;background:transparent;padding:5px}
 .week{min-width:162px;height:53px}
 .weekno{font-size:17px;font-weight:800}
 .dates{font-size:14px;color:#666;margin-top:3px;font-weight:500}
@@ -44,7 +45,8 @@ button:hover{background:#f4f6f9}
 .note{font-size:14px;color:#666;text-align:center;margin-top:9px;line-height:1.5}
 @media(max-width:600px){
  .wrap{padding:5px}.card{padding:7px;border-radius:8px}h1{font-size:22px}
- .subject{min-width:125px;width:125px}.subject input{width:96px}
+ .subject{min-width:125px;width:125px}.subject-head{font-size:20px!important;font-weight:800!important}
+.subject input{width:96px}
  .lesson{min-width:50px}.scroller{max-height:78vh}
 }
 </style>
@@ -65,6 +67,10 @@ button:hover{background:#f4f6f9}
 <div class="scroller">
 <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
 </div>
+<div class="actions subject-actions">
+ <button id="addSubjectBtn">＋ 과목 추가</button>
+ <button id="deleteSubjectBtn">－ 마지막 과목 삭제</button>
+</div>
 <div class="actions">
  <button id="exportBtn">기록 백업</button>
  <button id="importBtn">기록 복원</button>
@@ -77,17 +83,19 @@ button:hover{background:#f4f6f9}
 </div></div>
 <script>
 const ranges = ["8/31~9/6", "9/7~9/13", "9/14~9/20", "9/21~9/27", "9/28~10/4", "10/5~10/11", "10/12~10/18", "10/19~10/25", "10/26~11/1", "11/2~11/8", "11/9~11/15", "11/16~11/22", "11/23~11/29", "11/30~12/6"];
-const N=8, KEY='lectureTracker2026v2';
+const KEY='lectureTracker2026v2';
 let data=JSON.parse(localStorage.getItem(KEY)||'null')||{
- userName:'',subjects:Array.from({length:N},(_,i)=>`과목 ${i+1}`),done:{},exams:{}
+ userName:'',subjects:Array.from({length:8},(_,i)=>`과목 ${i+1}`),done:{},exams:{}
 };
+if(!Array.isArray(data.subjects)||data.subjects.length===0)data.subjects=['과목 1'];
+const subjectCount=()=>data.subjects.length;
 const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));update()};
 const fmt=()=>new Intl.DateTimeFormat('ko-KR',{
  month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false
 }).format(new Date()).replace(/\.$/,'');
 
 function buildHead(){
- let a='<tr><th class="num" rowspan="2">No.</th><th class="subject" rowspan="2">과목</th>';
+ let a='<tr><th class="num" rowspan="2">No.</th><th class="subject subject-head" rowspan="2">과목</th>';
  for(let w=1;w<=14;w++){
    a+=`<th class="week" colspan="3"><div class="weekno">${w}주차</div><div class="dates">${ranges[w-1]}</div></th>`;
    if(w===7) a+=`<th class="exam" rowspan="2"><b>중간고사</b><div class="dates">10/19~10/26</div></th>`;
@@ -99,7 +107,7 @@ function buildHead(){
 }
 function buildBody(){
  let out='';
- for(let s=0;s<N;s++){
+ for(let s=0;s<subjectCount();s++){
    out+=`<tr><td class="num">${s+1}</td><td class="subject"><input data-sub="${s}" value="${(data.subjects[s]||'').replaceAll('"','&quot;')}"></td>`;
    for(let w=1;w<=14;w++){
      for(let l=1;l<=3;l++){
@@ -131,14 +139,14 @@ function toggle(type,k){
 }
 function update(){
  let total=0;
- for(let s=0;s<N;s++){
+ for(let s=0;s<subjectCount();s++){
    let n=0;
    for(let w=1;w<=14;w++)for(let l=1;l<=3;l++)if(data.done[`${s}-${w}-${l}`])n++;
    total+=n;
    let el=document.querySelector('#r'+s);
    if(el)el.textContent=`${n}/42 (${Math.round(n/42*100)}%)`;
  }
- const max=N*42,p=Math.round(total/max*100);
+ const max=subjectCount()*42,p=max?Math.round(total/max*100):0;
  document.querySelector('#totalText').textContent=`전체 진도 ${total} / ${max}강 (${p}%)`;
  document.querySelector('#bar').style.width=p+'%';
 }
@@ -154,6 +162,23 @@ document.querySelector('#file').onchange=e=>{
  r.onload=()=>{try{data=JSON.parse(r.result);save();buildBody();alert('복원되었습니다.')}catch{alert('올바른 백업 파일이 아닙니다.')}};
  r.readAsText(f)
 };
+
+document.querySelector('#addSubjectBtn').onclick=()=>{
+ const n=data.subjects.length+1;
+ data.subjects.push(`과목 ${n}`);
+ save();buildBody();
+};
+document.querySelector('#deleteSubjectBtn').onclick=()=>{
+ if(data.subjects.length<=1){alert('과목은 최소 1개가 필요합니다.');return;}
+ const idx=data.subjects.length-1;
+ const name=data.subjects[idx]||`과목 ${idx+1}`;
+ if(!confirm(`"${name}" 과목을 삭제할까요?\n이 과목의 체크 기록도 함께 삭제됩니다.`))return;
+ Object.keys(data.done).forEach(k=>{if(k.startsWith(idx+'-'))delete data.done[k]});
+ Object.keys(data.exams).forEach(k=>{if(k.startsWith(idx+'-'))delete data.exams[k]});
+ data.subjects.pop();
+ save();buildBody();
+};
+
 const userNameEl=document.querySelector('#userName');
 const ownerTitle=document.querySelector('#ownerTitle');
 userNameEl.value=data.userName||'';
