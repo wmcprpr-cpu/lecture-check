@@ -78,11 +78,11 @@ button:hover{background:#f4f6f9}
 </div>
 <div class="note">
 강의 칸을 누르면 완료 날짜·시간이 자동 저장됩니다. 완료된 칸을 다시 누르면 확인 후 취소할 수 있습니다.<br>
-중간고사 기간은 10/19~10/26으로 표시했습니다. 기록은 현재 브라우저에 자동 저장됩니다.
+8주차는 중간고사(응시기간 10/19~10/26), 15주차는 기말고사로 표시했습니다. 기록은 현재 브라우저에 자동 저장됩니다.
 </div>
 </div></div>
 <script>
-const ranges = ["8/31~9/6", "9/7~9/13", "9/14~9/20", "9/21~9/27", "9/28~10/4", "10/5~10/11", "10/12~10/18", "10/19~10/25", "10/26~11/1", "11/2~11/8", "11/9~11/15", "11/16~11/22", "11/23~11/29", "11/30~12/6"];
+const ranges = ["8/31~9/6", "9/7~9/13", "9/14~9/20", "9/21~9/27", "9/28~10/4", "10/5~10/11", "10/12~10/18", "10/19~10/25", "10/26~11/1", "11/2~11/8", "11/9~11/15", "11/16~11/22", "11/23~11/29", "11/30~12/6", "12/7~12/13"];
 const KEY='lectureTracker2026v2';
 let data=JSON.parse(localStorage.getItem(KEY)||'null')||{
  userName:'',subjects:Array.from({length:8},(_,i)=>`과목 ${i+1}`),done:{},exams:{}
@@ -96,12 +96,19 @@ const fmt=()=>new Intl.DateTimeFormat('ko-KR',{
 
 function buildHead(){
  let a='<tr><th class="num" rowspan="2">No.</th><th class="subject subject-head" rowspan="2">과목</th>';
- for(let w=1;w<=14;w++){
-   a+=`<th class="week" colspan="3"><div class="weekno">${w}주차</div><div class="dates">${ranges[w-1]}</div></th>`;
-   if(w===7) a+=`<th class="exam" rowspan="2"><b>중간고사</b><div class="dates">10/19~10/26</div></th>`;
+ for(let w=1;w<=15;w++){
+   if(w===8){
+     a+=`<th class="exam" rowspan="2"><div class="weekno">8주차</div><b>중간고사</b><div class="dates">10/19~10/26</div></th>`;
+   }else if(w===15){
+     a+=`<th class="exam" rowspan="2"><div class="weekno">15주차</div><b>기말고사</b><div class="dates">${ranges[14]}</div></th>`;
+   }else{
+     a+=`<th class="week" colspan="3"><div class="weekno">${w}주차</div><div class="dates">${ranges[w-1]}</div></th>`;
+   }
  }
- a+=`<th class="exam" rowspan="2"><b>기말고사</b></th><th rowspan="2">진도율</th></tr><tr>`;
- for(let w=1;w<=14;w++) a+='<th>1강</th><th>2강</th><th>3강</th>';
+ a+='<th rowspan="2">진도율</th></tr><tr>';
+ for(let w=1;w<=15;w++){
+   if(w!==8 && w!==15) a+='<th>1강</th><th>2강</th><th>3강</th>';
+ }
  a+='</tr>';
  document.querySelector('#thead').innerHTML=a;
 }
@@ -109,18 +116,20 @@ function buildBody(){
  let out='';
  for(let s=0;s<subjectCount();s++){
    out+=`<tr><td class="num">${s+1}</td><td class="subject"><input data-sub="${s}" value="${(data.subjects[s]||'').replaceAll('"','&quot;')}"></td>`;
-   for(let w=1;w<=14;w++){
-     for(let l=1;l<=3;l++){
-       let k=`${s}-${w}-${l}`,v=data.done[k];
-       out+=`<td class="lesson ${v?'done':''}" data-key="${k}" title="${v||''}">${v?'✓<span class="time">'+v+'</span>':'○'}</td>`;
-     }
-     if(w===7){
+   for(let w=1;w<=15;w++){
+     if(w===8){
        let k=`${s}-중간고사`,v=data.exams[k];
        out+=`<td class="exam ${v?'done':''}" data-exam="${k}" title="${v||''}">${v?'✓<span class="time">'+v+'</span>':'○'}</td>`;
+     }else if(w===15){
+       let k=`${s}-기말고사`,v=data.exams[k];
+       out+=`<td class="exam ${v?'done':''}" data-exam="${k}" title="${v||''}">${v?'✓<span class="time">'+v+'</span>':'○'}</td>`;
+     }else{
+       for(let l=1;l<=3;l++){
+         let k=`${s}-${w}-${l}`,v=data.done[k];
+         out+=`<td class="lesson ${v?'done':''}" data-key="${k}" title="${v||''}">${v?'✓<span class="time">'+v+'</span>':'○'}</td>`;
+       }
      }
    }
-   let fk=`${s}-기말고사`,fv=data.exams[fk];
-   out+=`<td class="exam ${fv?'done':''}" data-exam="${fk}" title="${fv||''}">${fv?'✓<span class="time">'+fv+'</span>':'○'}</td>`;
    out+=`<td class="rate" id="r${s}"></td></tr>`;
  }
  document.querySelector('#tbody').innerHTML=out;
@@ -139,14 +148,16 @@ function toggle(type,k){
 }
 function update(){
  let total=0;
+ const lectureWeeks=[1,2,3,4,5,6,7,9,10,11,12,13,14];
+ const perSubject=lectureWeeks.length*3;
  for(let s=0;s<subjectCount();s++){
    let n=0;
-   for(let w=1;w<=14;w++)for(let l=1;l<=3;l++)if(data.done[`${s}-${w}-${l}`])n++;
+   lectureWeeks.forEach(w=>{for(let l=1;l<=3;l++)if(data.done[`${s}-${w}-${l}`])n++});
    total+=n;
    let el=document.querySelector('#r'+s);
-   if(el)el.textContent=`${n}/42 (${Math.round(n/42*100)}%)`;
+   if(el)el.textContent=`${n}/${perSubject} (${Math.round(n/perSubject*100)}%)`;
  }
- const max=subjectCount()*42,p=max?Math.round(total/max*100):0;
+ const max=subjectCount()*perSubject,p=max?Math.round(total/max*100):0;
  document.querySelector('#totalText').textContent=`전체 진도 ${total} / ${max}강 (${p}%)`;
  document.querySelector('#bar').style.width=p+'%';
 }
